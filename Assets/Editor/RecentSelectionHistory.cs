@@ -3,27 +3,29 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEditor.Animations;
 
 public class RecentSelectionHistory : EditorWindow
 {
 
-	public const int historyMaxItems = 50; // change this to increase/decrease max stored history items
+	public static int historyMaxItems = 100;
 
-    List<Object> recordedActions;
-	public Object selectedObject;
-	public Object previousSelectedObject = null;
+    public static List<Object> recordedActions;
+	public static Object selectedObject = null;
+	public static Object previousSelectedObject = null;
 	
 	Vector2 historyScrollView;
 
 	public enum FileAction {
+		Highlight,
+		HighlightButOnlyOpenScripts,
 		OpenAndHighlight,
-		Open,
-		Highlight
+		Open
 	}
 
-	public FileAction fileAction = FileAction.OpenAndHighlight;
+	public FileAction fileAction = FileAction.Highlight;
 
-	public bool pauseRecording = false;
+	public static bool pauseRecording = false;
 	
 	[MenuItem("Window/Recent Selection History...")]
     static void OpenCustomEditor()
@@ -40,15 +42,16 @@ public class RecentSelectionHistory : EditorWindow
 		
 		window.Show();	// show the window
 		window.Focus(); // keyboard focus the window
+
+		EditorApplication.update -= UpdateList;
+		EditorApplication.update += UpdateList;
 		
     }
 
-    void OnGUI()
-    {
+	static void UpdateList()
+	{
 
-        Color originalColor = GUI.color;
-
-        selectedObject = Selection.activeObject;
+		selectedObject = Selection.activeObject;
 
 		if (recordedActions == null) {
 			recordedActions = new List<Object>();
@@ -87,6 +90,15 @@ public class RecentSelectionHistory : EditorWindow
 			previousSelectedObject = null;
 		}
 
+	}
+
+    void OnGUI()
+    {
+
+        Color originalColor = GUI.color;
+
+		UpdateList();
+
 		// window contents
 		
 		historyScrollView = EditorGUILayout.BeginScrollView(historyScrollView);
@@ -103,20 +115,71 @@ public class RecentSelectionHistory : EditorWindow
 
 							if (AssetDatabase.IsValidFolder((AssetDatabase.GetAssetPath(recordedAction)))) {
 
-								GUI.color = new Color32(255, 85, 163, 255);
 
-								if (GUILayout.Button(recordedAction.name)) {
+								
+								Texture2D buttonIcon = EditorGUIUtility.IconContent("Folder Icon").image as Texture2D;
+								GUIContent buttonContent = new GUIContent(" "+recordedAction.name, buttonIcon);
+								buttonContent.tooltip = AssetDatabase.GetAssetPath(recordedAction);
+								GUI.skin.button.alignment = TextAnchor.MiddleLeft;
+
+								if (GUILayout.Button(buttonContent, new GUILayoutOption[] { GUILayout.Height(24) })) {
 									EditorGUIUtility.PingObject(recordedAction);
 								}
 
+
+
 							} else {
 
-								GUI.color = new Color32(0, 185, 251, 255);
+								bool isScriptAsset = false;
 
-								if (GUILayout.Button(recordedAction.name)) {
+								Texture2D buttonIcon = null;
+
+								//Debug.Log(recordedAction.GetType());
 								
-									if (fileAction == FileAction.Highlight || fileAction == FileAction.OpenAndHighlight) {
+								if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(SceneAsset)) {
+									buttonIcon = EditorGUIUtility.IconContent("SceneAsset Icon").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(MonoScript)) {
+									buttonIcon = EditorGUIUtility.IconContent("cs Script Icon").image as Texture2D;
+									isScriptAsset = true;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(AudioClip)) {
+									buttonIcon = EditorGUIUtility.IconContent("AudioSource Gizmo").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(Shader)) {
+									buttonIcon = EditorGUIUtility.IconContent("Shader Icon").image as Texture2D;
+									isScriptAsset = true;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(Material)) {
+									buttonIcon = EditorGUIUtility.IconContent("Material Icon").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(GameObject)) {
+									buttonIcon = EditorGUIUtility.IconContent("Prefab Icon").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(ScriptableObject)) {
+									buttonIcon = EditorGUIUtility.IconContent("ScriptableObject Icon").image as Texture2D;
+									isScriptAsset = true;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(Texture2D)) {
+									buttonIcon = EditorGUIUtility.IconContent("Texture2D Icon").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(Texture)) {
+									buttonIcon = EditorGUIUtility.IconContent("Texture Icon").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(AnimationClip)) {
+									buttonIcon = EditorGUIUtility.IconContent("AnimationClip Icon").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(AnimatorController)) {
+									buttonIcon = EditorGUIUtility.IconContent("AnimatorController Icon").image as Texture2D;
+								} else if (AssetDatabase.GetMainAssetTypeAtPath(AssetDatabase.GetAssetPath(recordedAction)) == typeof(Font)) {
+									buttonIcon = EditorGUIUtility.IconContent("Font Icon").image as Texture2D;
+								} else {
+									buttonIcon = EditorGUIUtility.IconContent("DefaultAsset Icon").image as Texture2D;
+								}
+
+								GUIContent buttonContent = new GUIContent(" "+recordedAction.name, buttonIcon);
+								buttonContent.tooltip = AssetDatabase.GetAssetPath(recordedAction);
+								GUI.skin.button.alignment = TextAnchor.MiddleLeft;
+
+								if (GUILayout.Button(buttonContent, new GUILayoutOption[] { GUILayout.Height(24) })) {
+
+									if (fileAction == FileAction.Highlight || fileAction == FileAction.OpenAndHighlight || fileAction == FileAction.HighlightButOnlyOpenScripts) {
 										EditorGUIUtility.PingObject(recordedAction);
+										Selection.activeObject = recordedAction;
+									}
+
+									if ((fileAction != FileAction.Open || fileAction != FileAction.OpenAndHighlight) && (isScriptAsset && fileAction == FileAction.HighlightButOnlyOpenScripts)) {
+											AssetDatabase.OpenAsset(recordedAction);
 									}
 									
 									if (fileAction == FileAction.OpenAndHighlight || fileAction == FileAction.Open) {
@@ -133,19 +196,28 @@ public class RecentSelectionHistory : EditorWindow
 
 								}
 
+
 							}
 
 
 							
 
 						} else {
-
-							GUI.color = new Color32(255, 170, 29, 255);
 							
-							if (GUILayout.Button(recordedAction.name)) {
-								EditorGUIUtility.PingObject(recordedAction);
-								Selection.activeGameObject = recordedAction as GameObject;
-							}
+
+								Texture2D buttonIcon = EditorGUIUtility.IconContent("GameObject Icon").image as Texture2D;
+								GUIContent buttonContent = new GUIContent(" "+recordedAction.name, buttonIcon);
+								buttonContent.tooltip = AssetDatabase.GetAssetPath(recordedAction);
+								GUI.skin.button.alignment = TextAnchor.MiddleLeft;
+
+								if (GUILayout.Button(buttonContent, new GUILayoutOption[] { GUILayout.Height(24) })) {
+
+									EditorGUIUtility.PingObject(recordedAction);
+									Selection.activeGameObject = recordedAction as GameObject;
+
+								}
+	
+
 
 						}
 					}
@@ -157,6 +229,8 @@ public class RecentSelectionHistory : EditorWindow
 		}
 
 		EditorGUILayout.EndScrollView();
+
+		GUI.skin.button.alignment = TextAnchor.MiddleCenter;
 
 		if (recordedActions.Count > historyMaxItems) {
 			recordedActions.RemoveRange(historyMaxItems, recordedActions.Count - historyMaxItems);
@@ -183,6 +257,8 @@ public class RecentSelectionHistory : EditorWindow
 		pauseRecording = EditorGUILayout.Toggle("Pause Recording", pauseRecording);
 		fileAction = (FileAction)EditorGUILayout.EnumPopup("File Action", fileAction, EditorStyles.popup);
 
+		historyMaxItems = EditorGUILayout.IntSlider("Max History Items", historyMaxItems, 10, 3000);
+
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.Space();
@@ -191,9 +267,6 @@ public class RecentSelectionHistory : EditorWindow
 
 		if (GUILayout.Button("Clear")) {
 			recordedActions.Clear();
-		}
-		if (GUILayout.Button("Close")) {
-			this.Close();
 		}
 
 		EditorGUILayout.EndHorizontal();
